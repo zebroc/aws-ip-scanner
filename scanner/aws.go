@@ -1,4 +1,4 @@
-package main
+package scanner
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -6,32 +6,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"log"
-	"os"
 )
 
 var (
 	Session *session.Session
 )
-
-func init() {
-	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	region := os.Getenv("AWS_REGION")
-
-	if accessKeyID == "" {
-		log.Fatal("You need to set AWS_ACCESS_KEY_ID")
-	}
-
-	if secretAccessKey == "" {
-		log.Fatal("You need to set AWS_SECRET_ACCESS_KEY")
-	}
-
-	if region == "" {
-		region = "eu-west-1"
-	}
-
-	CreateSessionWithConfig(accessKeyID, secretAccessKey, "", region)
-}
 
 // CreateSessionWithConfig creates a session with the configuration provided
 // sessionToken can be empty

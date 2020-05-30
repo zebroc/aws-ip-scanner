@@ -1,0 +1,30 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - SERVICE=${RSB_SERVICE:=rsb-service-portscan}
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+      - REPOSITORY_BASE_URI=${RSB_REPOSITORY_BASE_URI:=634401859868.dkr.ecr.eu-west-1.amazonaws.com}
+      - REPOSITORY_URI=${RSB_REPOSITORY_URI:=$REPOSITORY_BASE_URI/$SERVICE}
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=UNKNOWN}
+      - echo Everything ready to deploy $SERVICE to $REPOSITORY_URI with tag $IMAGE_TAG
+  build:
+    commands:
+      - echo Build started on `date` building the Docker image...
+      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG
+      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:$RSB_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date` pushing the Docker images...
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:$RSB_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"%s","imageUri":"%s"}]' $SERVICE $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - sh .tools/slack '['$CODEBUILD_INITIATOR'] New version ('$IMAGE_TAG' / '$RSB_TAG') of '$SERVICE' built & about to be deployed…'
+artifacts:
+  files: imagedefinitions.json
