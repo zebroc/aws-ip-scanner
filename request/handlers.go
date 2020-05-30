@@ -15,13 +15,24 @@ func eventAction(c *gin.Context) {
 		return
 	}
 
+	if event.Event != "AWSAccountPubScan" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only AWSAccountPubScan events accepted here"})
+		return
+	}
+
 	var portScanPayload scanner.PortScanPayload
 	errUnmarshal := json.Unmarshal(event.Payload, &portScanPayload)
 	if errUnmarshal != nil {
-
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect payload format: " + errUnmarshal.Error()})
+		return
 	}
 
-	portScanResult := scanner.Scan(portScanPayload.AWSKey, portScanPayload.AWSSecret, "", portScanPayload.AWSRregion)
+	if portScanPayload.AWSKey == "" || portScanPayload.AWSSecret == "" || portScanPayload.AWSRegion == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Payload must include values for AWSKey, AWSSecret and AWSRegion (AWSToken is optional for STS)"})
+		return
+	}
+
+	portScanResult := scanner.Scan(portScanPayload.AWSKey, portScanPayload.AWSSecret, portScanPayload.AWSToken, portScanPayload.AWSRegion)
 
 	c.JSON(http.StatusOK, portScanResult)
 }

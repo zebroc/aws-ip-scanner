@@ -10,10 +10,14 @@ import (
 )
 
 var (
-	ports = []int{21, 22, 80, 443, 3306, 6379, 8080, 11211}
+	ports          = []int{21, 22, 80, 443, 3306, 6379, 8080, 11211}
+	PrintHostState = false
 )
 
 func init() {
+	if phs, phsSet := os.LookupEnv("PRINT_HOST_STATE"); phsSet && phs != "" {
+		PrintHostState = phs == "true"
+	}
 	if p := os.Getenv("AWS_IP_SCANNER_PORTS"); p != "" {
 		ports = []int{}
 		for _, portStr := range strings.Split(p, ",") {
@@ -33,7 +37,7 @@ func Scan(accessKeyID, secretAccessKey, sessionToken, region string) PortScanRes
 	}
 
 	portScanResult.PublicIPs = ips
-	portScanResult.Ports = make(map[string]map[string]string)
+	portScanResult.Ports = make(map[string]map[int]string)
 
 	var wg sync.WaitGroup
 	wg.Add(len(ips))
@@ -45,8 +49,6 @@ func Scan(accessKeyID, secretAccessKey, sessionToken, region string) PortScanRes
 
 func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {
 	for _, ip := range ips {
-		portScanResult.Ports[ip] = make(map[string]string)
-
 		go func(ip string, wg *sync.WaitGroup) {
 			defer wg.Done()
 			hostState := fmt.Sprintf("%s\t", ip)
@@ -54,7 +56,7 @@ func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {
 			for _, port := range ports {
 				state := ScanPort(ip, port, time.Second)
 				if strings.Contains(state, "open") {
-					openPorts[port] = state
+					openPorts[port] = "open"
 					hostState = hostState + fmt.Sprintf("%d", port) + ", "
 				}
 			}
@@ -67,6 +69,7 @@ func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {
 				} else {
 					hostState = strings.TrimSuffix(hostState, ", ")
 					hostState = fmt.Sprintf("%s\tHTTP (%d): %s", hostState, code, strings.Replace(body, "\n", "", 999))
+					openPorts[80] = strings.Replace(body, "\n", "", 999)
 				}
 			}
 
@@ -78,6 +81,7 @@ func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {
 				} else {
 					hostState = strings.TrimSuffix(hostState, ", ")
 					hostState = fmt.Sprintf("%s\tHTTPS (%d): %s", hostState, code, strings.Replace(body, "\n", "", 999))
+					openPorts[443] = strings.Replace(body, "\n", "", 999)
 				}
 			}
 
@@ -89,13 +93,18 @@ func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {
 				} else {
 					hostState = strings.TrimSuffix(hostState, ", ")
 					hostState = fmt.Sprintf("%s\tHTTP-ALT (%d): %s", hostState, code, strings.Replace(body, "\n", "", 999))
+					openPorts[8080] = strings.Replace(body, "\n", "", 999)
 				}
 			}
 
 			if hostState != fmt.Sprintf("%s\t", ip) {
 				hostState = strings.TrimSuffix(hostState, ", ")
-				fmt.Printf(hostState + "\n")
+				if PrintHostState {
+					fmt.Printf(hostState + "\n")
+				}
 			}
+
+			portScanResult.Set(ip, openPorts)
 		}(ip, wg)
 	}
 }
