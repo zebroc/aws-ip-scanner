@@ -1,5 +1,7 @@
+name: Release
+
 on: release
-name: Build
+
 jobs:
   release-linux-386:
     name: release linux/386

@@ -1,0 +1,40 @@
+name: Build and test
+
+on:
+  pull_request:
+    branches: [ master, staging ]
+    paths-ignore:
+      - '.gitignore'
+      - 'README.md'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14
+        id: go
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+      - name: go fmt
+        run: |
+          O=$(gofmt -d -l .)
+          if [ "$O" == "" ]; then echo "Beautiful! 😍"; else echo "$O" && exit 255; fi
+      - name: go build
+        env:
+          GOPROXY: "https://proxy.golang.org,direct"
+          CGO_ENABLED: "0"
+        run: |
+          O=$(go build .)
+          if [ "$O" == "" ]; then echo "Build successful"; else echo "$O" && exit 255; fi
+      - name: go tests
+        run: |
+          O=$(go test ./...)
+          if [ $? -eq 0 ]; then echo "Tests successful"; else echo "$O" && exit 255; fi
+      - name: go vet
+        run: |
+          O=$(go vet ./...)
+          if [ "$O" == "" ]; then echo "Tests successful"; else echo "$O" && exit 255; fi
