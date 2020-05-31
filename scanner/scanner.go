@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ports          = []int{21, 22, 80, 443, 3306, 6379, 8080, 11211}
+	ports          = []int{21, 22, 23, 80, 443, 3306, 6379, 8080, 11211}
 	PrintHostState = false
 )
 
@@ -27,8 +27,8 @@ func init() {
 	}
 }
 
-func Scan(accessKeyID, secretAccessKey, sessionToken, region string) PortScanResult {
-	CreateSessionWithConfig(accessKeyID, secretAccessKey, sessionToken, region)
+func Scan(payload PortScanPayload) *PortScanResult {
+	CreateSessionWithConfig(payload.AWSKey, payload.AWSSecret, payload.AWSSessionToken, payload.AWSRegion)
 
 	var portScanResult PortScanResult
 	ips, err := getIPs()
@@ -44,7 +44,7 @@ func Scan(accessKeyID, secretAccessKey, sessionToken, region string) PortScanRes
 	scan(&wg, ips, &portScanResult)
 	wg.Wait()
 
-	return portScanResult
+	return &portScanResult
 }
 
 func scan(wg *sync.WaitGroup, ips []string, portScanResult *PortScanResult) {

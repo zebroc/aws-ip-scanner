@@ -1,22 +1,32 @@
 package scanner
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+)
 
 type PortScanPayload struct {
-	AWSKey    string
-	AWSSecret string
-	AWSToken  string
-	AWSRegion string
+	AWSKey          string `json:"aws_key"`
+	AWSSecret       string `json:"aws_secret"`
+	AWSSessionToken string `json:"aws_session_token"`
+	AWSRegion       string `json:"aws_region"`
+	SendCallback    bool   `json:"send_callback"`
+	CallbackURL     string `json:"callback_url"`
 }
 
 type PortScanResult struct {
+	mu        sync.Mutex
 	PublicIPs []string
 	Ports     map[string]map[int]string
 }
 
 func (p *PortScanResult) Set(key string, value map[int]string) {
-	var mu sync.Mutex
-	mu.Lock()
+	p.mu.Lock()
 	p.Ports[key] = value
-	mu.Unlock()
+	p.mu.Unlock()
+}
+
+func (p *PortScanResult) JSON() []byte {
+	res, _ := json.Marshal(p)
+	return res
 }
