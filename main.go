@@ -1,12 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/zebroc/aws-ip-scanner/aws"
+	"github.com/zebroc/aws-ip-scanner/scanner"
 )
 
 var (
@@ -24,7 +31,7 @@ func init() {
 }
 
 func main() {
-	ips, err := getIPs()
+	ips, err := aws.GetIPs()
 	if err != nil {
 		fmt.Printf("Unable to fetch IPs: %v", err)
 	}
@@ -42,7 +49,7 @@ func scan(wg *sync.WaitGroup, ips []string) {
 			hostState := fmt.Sprintf("%s\t", ip)
 			openPorts := make(map[int]string)
 			for _, port := range ports {
-				state := ScanPort(ip, port, time.Second)
+				state := scanner.ScanPort(ip, port, time.Second)
 				if strings.Contains(state, "open") {
 					openPorts[port] = state
 					hostState = hostState + fmt.Sprintf("%d", port) + ", "
@@ -88,4 +95,38 @@ func scan(wg *sync.WaitGroup, ips []string) {
 			}
 		}(ip, wg)
 	}
+}
+
+func getURL(url string) (string, int, error) {
+	success := false
+
+	httpClient := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	for i := 1; !success && i <= 3; i++ {
+		req, _ := http.NewRequest("GET", url, bytes.NewBuffer(nil))
+
+		resp, _ := httpClient.Do(req)
+
+		if resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			success = true
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(resp.Body)
+			return buf.String(), resp.StatusCode, nil
+		} else if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return "", http.StatusNotFound, nil
+		} else {
+			time.Sleep(time.Duration(i) * time.Second)
+		}
+
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}
+
+	return "", http.StatusRequestTimeout, errors.New("timeout")
 }

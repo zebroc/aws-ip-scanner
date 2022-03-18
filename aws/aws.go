@@ -1,12 +1,13 @@
-package main
+package aws
 
 import (
+	"log"
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"log"
-	"os"
 )
 
 var (
@@ -16,6 +17,7 @@ var (
 func init() {
 	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
 	region := os.Getenv("AWS_REGION")
 
 	if accessKeyID == "" {
@@ -26,11 +28,15 @@ func init() {
 		log.Fatal("You need to set AWS_SECRET_ACCESS_KEY")
 	}
 
+	if sessionToken == "" {
+		log.Fatal("You need to set AWS_SESSION_TOKEN")
+	}
+
 	if region == "" {
 		region = "eu-west-1"
 	}
 
-	CreateSessionWithConfig(accessKeyID, secretAccessKey, "", region)
+	CreateSessionWithConfig(accessKeyID, secretAccessKey, sessionToken, region)
 }
 
 // CreateSessionWithConfig creates a session with the configuration provided
@@ -48,7 +54,7 @@ func CreateSessionWithConfig(accessKeyID, secretAccessKey, sessionToken, region 
 	Session = s
 }
 
-func getIPs() ([]string, error) {
+func GetIPs() ([]string, error) {
 	var ips []string
 	svc := ec2.New(Session)
 
